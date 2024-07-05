@@ -14,25 +14,48 @@ npm install steper
 
 ## Usage
 
-```javascript
+````html
+<ul id="slider">
+  <li> slide 1 </li>
+  <li> slide 2 </li>
+  <li> slide 3 </li>
+</ul>
+<nav>
+  <button id="left">left</button>
+  <button id="left">right</button>
+</nav>
+<script>
 import { useDraggableAnimation, useSliderAnimation } from 'steper';
 
-// Initialize your elements and use the functions as need
+const steperRef = document.getElementById('slider')
 
-```
+//make it draggable
+useDraggableAnimation(steperRef);
+
+// and or slide it
+const move = useSliderAnimation(steperRef);
+// to left
+document.getElementById('left').addEventListener('click', () => move(-1))
+// to right
+document.getElementById('right').addEventListener('click', () => move(1))
+
+
+</script>
+````
+
 
 ## API
 
 ### useDraggableAnimation(ref, onDragStart, onDragEnd)
-* ref: The reference to the HTML element.
-* onDragStart: Callback function when dragging starts.
-* onDragEnd: Callback function when dragging ends.
+* `ref`: The reference to the HTML element.
+* `onDragStart`: Callback function when dragging starts.
+* `onDragEnd`: Callback function when dragging ends.
 
 ### useSliderAnimation(ref, duration, onSlideStart, onSlideEnd)
-* ref: The referenceC to the HTML element.
-* duration: Duration of the slide animation.
-* onSlideStart: Callback function when sliding starts.
-* onSlideEnd: Callback function when sliding ends.
+* `ref`: The referenceC to the HTML element.
+* `duration`: Duration of the slide animation in seconds.
+* `onSlideStart`: Callback function when sliding starts.
+* `onSlideEnd`: Callback function when sliding ends.
 
 ## License
 
