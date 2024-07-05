@@ -2,6 +2,10 @@
 
 A lightweight JavaScript library for draggable and slider animations.
 
+![steper](./demo/public/logo_proposal.webp)
+
+[Demo Examples](https://steper.netlify.app/)
+
 ## Installation
 
 ```bash
