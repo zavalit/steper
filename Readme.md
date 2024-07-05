@@ -14,20 +14,23 @@ npm install steper
 
 ## Usage
 
+HTML markup
 ````html
-<!-- HTML markup -->
+<!-- slider markup -->
 <ul id="slider">
   <li> slide 1 </li>
   <li> slide 2 </li>
   <li> slide 3 </li>
 </ul>
+
+<!-- navigation markup -->
 <nav>
   <button id="left">left</button>
   <button id="left">right</button>
 </nav>
-
-<!-- JS Logic -->
-<script>
+````
+Javascript Logic
+```js
 import { useDraggableAnimation, useSliderAnimation } from 'steper';
 
 const steperRef = document.getElementById('slider')
@@ -41,8 +44,6 @@ const move = useSliderAnimation(steperRef);
 document.getElementById('left').addEventListener('click', () => move(-1))
 // to right
 document.getElementById('right').addEventListener('click', () => move(1))
-
-</script>
 ````
 
 
