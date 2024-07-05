@@ -1,0 +1,16 @@
+{
+  "name": "steper",
+ "version": "0.0.1",
+  "description": "A lightweight JavaScript library for draggable and slider animations",
+  "main": "dist/index.js",
+  "types": "dist/types/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": ["steper", "draggable", "slider", "animation", "JavaScript", "TypeScript"],
+  "author": "Seva Dolgooplov",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^4.0.0"
+  }
+}
