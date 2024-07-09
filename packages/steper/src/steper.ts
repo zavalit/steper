@@ -9,14 +9,11 @@ const easeInOut = (currentX: number, targetX: number): number => {
   return interpolate(currentX, targetX, t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 };
 
-const easeInP = (p: number) => p * p;
-const easeOutP = (p: number) => 1 - Math.pow(1 - p, 2);
-
-const easeInOutP = (p: number) => (1 - p) * easeInP(p) + p * easeOutP(p);
+const easeInOutP = (p: number): number => p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
 
 // Get the nearest list item
-const getNearestListItem = (ref: HTMLElement) => {
-  const items = Array.from(ref.children || []) as HTMLElement[];
+const getNearestListItem = (ref: HTMLElement): { index: number; targetX: number; currentX: number } => {
+  const items = Array.from(ref.children) as HTMLElement[];
   const containerRect = ref.getBoundingClientRect();
   const currentX = parseFloat(ref.style.transform.replace('translateX(', '').replace('px)', '')) || 0;
 
@@ -39,122 +36,188 @@ const getNearestListItem = (ref: HTMLElement) => {
   return { index: slideIndex, targetX: snapLeft, currentX };
 };
 
-const setDataAttribute = (ref: HTMLElement, mode: string) => {
-  if (!ref) return;
-  ref.dataset.stepperMode = mode;
+const getListItemXByIndex = (ref: HTMLElement, index: number): number => {
+  const containerRect = ref.getBoundingClientRect();
+  const items = Array.from(ref.children) as HTMLElement[];
+  const indexRect = items[index]?.getBoundingClientRect();
+
+  return indexRect ? containerRect.left - indexRect.left : 0;
 };
 
-const hasDataAttribute = (ref: HTMLElement, mode: string): boolean => ref.dataset.stepperMode === mode;
+const setXByIndex = (ref: HTMLElement, index: number): void => {
+  const x = getListItemXByIndex(ref, index);
+  setTranslateX(ref, x);
+};
 
-const useDraggableAnimation = (
+const setClass = (ref: HTMLElement, className: string): void => {
+  ref.className = '';
+  className && ref.classList.add(className);
+};
+
+const hasClass = (ref: HTMLElement, className: string): boolean => ref.classList.contains(className);
+
+const setTranslateX = (ref: HTMLElement, x: number): void => {
+  if (ref) {
+    ref.style.transform = `translateX(${x}px)`;
+  }
+};
+
+type SignalCB = (value: number) => void;
+
+class Signal {
+  private cbs: SignalCB[] = [];
+
+  add(cb: SignalCB): void {
+    this.cbs.push(cb);
+  }
+
+  fire(value: number): void {
+    this.cbs.forEach(cb => cb(value));
+  }
+
+  destroy(): void {
+    this.cbs = [];
+  }
+}
+
+const draggableAnimation = (
   ref: HTMLElement,
-  onDragStart?: (slideElement?: HTMLElement) => void,
-  onDragEnd?: (slideElement?: HTMLElement) => void
-): (() => void) => {
-  const draggingMode = 'dragging';
-  const isDragging = { current: false };
-  const dragStartX = { current: null as number | null };
-  const dragCurrentX = { current: null as number | null };
-  const startX = { current: 0 };
-  const animationRef = { current: null as number | null };
-  let targetIndex = 0;
+  onDragStart?: (el: HTMLElement) => void,
+  onDragEnd?: (el: HTMLElement) => void
+): [Signal, () => void] => {
+  const draggingClassName = 'dragging';
+  let isDragging = false;
+  let dragStartX: number | null = null;
+  let dragCurrentX: number | null = null;
+  let startX = 0;
+  let animationRef: number | null = null;
+  const targetIndex = { current: 0 };
 
-  const setTranslateX = (x: number) => {
-    if (ref) {
-      ref.style.transform = `translateX(${x}px)`;
-    }
-  };
+  const targetIndexSignal = new Signal();
+  targetIndexSignal.add(value => (targetIndex.current = value));
 
-  const animate = () => {
-    if (dragCurrentX.current !== null && dragStartX.current !== null) {
-      const deltaX = dragCurrentX.current - dragStartX.current;
-      const targetX = startX.current + deltaX;
+  const animate = (): void => {
+    if (dragCurrentX !== null && dragStartX !== null) {
+      const deltaX = dragCurrentX - dragStartX;
+      const targetX = startX + deltaX;
       const currentX = parseFloat(ref.style.transform.replace('translateX(', '').replace('px)', '')) || 0;
       const newX = easeInOut(currentX, targetX);
 
-      setTranslateX(newX);
+      setTranslateX(ref, newX);
     }
 
-    animationRef.current = requestAnimationFrame(animate);
+    animationRef = requestAnimationFrame(animate);
   };
 
-  const snapAnimate = (targetX: number) => {
-    if (isDragging.current) return;
+  const snapAnimate = (targetX: number): void => {
+    if (isDragging) return;
     const currentX = parseFloat(ref.style.transform.replace('translateX(', '').replace('px)', '')) || 0;
     const newX = interpolate(currentX, targetX, 0.05);
-    setTranslateX(newX);
+    setTranslateX(ref, newX);
 
     const distance = Math.abs(Math.round(targetX - newX));
-    if (distance > 0 && hasDataAttribute(ref, draggingMode)) {
+    if (distance > 0 && hasClass(ref, draggingClassName)) {
       requestAnimationFrame(() => snapAnimate(targetX));
     } else {
-      setDataAttribute(ref, '');
+      setClass(ref, '');
       const nearestItem = getNearestListItem(ref);
       onDragEnd && onDragEnd(ref.children[nearestItem.index] as HTMLElement);
     }
   };
 
-  const mouseDown = (e: MouseEvent) => {
-    e.preventDefault();
-
-    isDragging.current = true;
-    dragStartX.current = e.clientX;
-    dragCurrentX.current = e.clientX;
+  const startDrag = (clientX: number): void => {
+    isDragging = true;
+    dragStartX = clientX;
+    dragCurrentX = clientX;
     const nearestItem = getNearestListItem(ref);
-    startX.current = nearestItem.currentX;
+    startX = nearestItem.currentX;
     ref.style.willChange = 'transform';
 
-    onDragStart && onDragStart(ref.children[nearestItem.index]  as HTMLElement);
-    animationRef.current = requestAnimationFrame(animate);
+    onDragStart && onDragStart(ref.children[nearestItem.index] as HTMLElement);
+    animationRef = requestAnimationFrame(animate);
   };
 
-  const mouseMove = (e: MouseEvent) => {
-    if (isDragging.current) dragCurrentX.current = e.clientX;
-  };
+  const stopDrag = (): void => {
+    if (!isDragging) return;
 
-  const mouseUp = () => {
-    if (!isDragging.current) return;
-
-    isDragging.current = false;
-    dragStartX.current = null;
-    dragCurrentX.current = null;
-    cancelAnimationFrame(animationRef.current!);
+    isDragging = false;
+    dragStartX = null;
+    dragCurrentX = null;
+    if (animationRef !== null) cancelAnimationFrame(animationRef);
     ref.style.willChange = 'auto';
 
     const nearestItem = getNearestListItem(ref);
-    setDataAttribute(ref, draggingMode);
+    setClass(ref, draggingClassName);
     requestAnimationFrame(() => snapAnimate(nearestItem.targetX));
-    targetIndex = nearestItem.index;
+    targetIndexSignal.fire(nearestItem.index);
   };
+
+  const mouseDown = (e: MouseEvent): void => {
+    e.preventDefault();
+    startDrag(e.clientX);
+  };
+
+  const mouseMove = (e: MouseEvent): void => {
+    if (isDragging) dragCurrentX = e.clientX;
+  };
+
+  const mouseUp = (): void => stopDrag();
+
+  const touchStart = (e: TouchEvent): void => {
+    e.preventDefault();
+    startDrag(e.touches[0].clientX);
+  };
+
+  const touchMove = (e: TouchEvent): void => {
+    if (isDragging) dragCurrentX = e.touches[0].clientX;
+  };
+
+  const touchEnd = (): void => stopDrag();
 
   ref.addEventListener('mousedown', mouseDown);
   window.addEventListener('mousemove', mouseMove);
   window.addEventListener('mouseup', mouseUp);
 
-  return () => {
-    ref.removeEventListener('mousedown', mouseDown);
-    window.removeEventListener('mousemove', mouseMove);
-    window.removeEventListener('mouseup', mouseUp);
-    cancelAnimationFrame(animationRef.current!);
-  };
+  ref.addEventListener('touchstart', touchStart);
+  window.addEventListener('touchmove', touchMove);
+  window.addEventListener('touchend', touchEnd);
+
+  return [
+    targetIndexSignal,
+    () => {
+      ref.removeEventListener('mousedown', mouseDown);
+      window.removeEventListener('mousemove', mouseMove);
+      window.removeEventListener('mouseup', mouseUp);
+
+      ref.removeEventListener('touchstart', touchStart);
+      window.removeEventListener('touchmove', touchMove);
+      window.removeEventListener('touchend', touchEnd);
+
+      targetIndexSignal.destroy();
+      if (animationRef !== null) cancelAnimationFrame(animationRef);
+    },
+  ];
 };
 
-const useSliderAnimation = (
+const sliderAnimation = (
   ref: HTMLElement,
-  duration = 1,
-  onSlideStart?: (slideElement: HTMLElement) => void,
-  onSlideEnd?: (slideElement: HTMLElement) => void
-) => {
-  const animationRef = { current: null as number | null };
-  const startTimestamp = { current: null as number | null };
+  duration: number = 1,
+  onSlideStart?: (el: HTMLElement) => void,
+  onSlideEnd?: (el: HTMLElement) => void
+): ((step: number) => number) => {
+  if (!ref) {
+    console.warn('useSliderAnimation: no parent container');
+  }
+  let animationRef: number | null = null;
+  let startTimestamp: number | null = null;
 
-  const animate = (timestamp: number, startX: number, endX: number, duration: number, el: HTMLElement) => {
-    if (!startTimestamp.current) {
-      startTimestamp.current = timestamp;
+  const animate = (timestamp: number, startX: number, endX: number, duration: number, el: HTMLElement): void => {
+    if (!startTimestamp) {
+      startTimestamp = timestamp;
       onSlideStart?.(el);
     }
 
-    const elapsed = timestamp - startTimestamp.current;
+    const elapsed = timestamp - startTimestamp;
     const progress = Math.min(elapsed / duration, 1);
     const p = easeInOutP(progress);
     const currentX = startX + (endX - startX) * p;
@@ -164,10 +227,10 @@ const useSliderAnimation = (
     }
 
     if (progress < 1) {
-      animationRef.current = requestAnimationFrame((ts) => animate(ts, startX, endX, duration, el));
+      animationRef = requestAnimationFrame(ts => animate(ts, startX, endX, duration, el));
     } else {
       onSlideEnd?.(el);
-      startTimestamp.current = null;
+      startTimestamp = null;
     }
   };
 
@@ -186,14 +249,14 @@ const useSliderAnimation = (
 
     if (nearestItem.targetX - targetX === 0) return targetIndex;
 
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-      startTimestamp.current = null;
+    if (animationRef) {
+      cancelAnimationFrame(animationRef);
+      startTimestamp = null;
     }
 
-    setDataAttribute(ref, 'sliding');
+    setClass(ref, 'sliding');
     const durationInMilliSec = duration * 1000;
-    animationRef.current = requestAnimationFrame((timestamp) =>
+    animationRef = requestAnimationFrame(timestamp =>
       animate(timestamp, nearestItem.currentX, targetX, durationInMilliSec, el)
     );
 
@@ -203,5 +266,4 @@ const useSliderAnimation = (
   return move;
 };
 
-// Export the vanilla JS functions
-export { useDraggableAnimation, useSliderAnimation, interpolate, easeInOut, easeInOutP };
+export { draggableAnimation, sliderAnimation, setXByIndex };
